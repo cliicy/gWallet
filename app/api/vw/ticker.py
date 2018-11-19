@@ -1,12 +1,12 @@
 from flask import jsonify, Blueprint
 import time
 import pandas as pd
-from app.config.secure import coll
+from app.config.old_secure import coll
 
-ticker = Blueprint('ticker', __name__)
+tickers = Blueprint('ticker', __name__)
 
 
-@ticker.route('/vw/ticker', methods=['GET'])
+@tickers.route('/vw/tickers', methods=['GET'])
 def get_ticker_info():
     while True:
         try:
