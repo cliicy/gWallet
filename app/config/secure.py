@@ -19,6 +19,7 @@ mdb = {
     "M1": 'dw_M1',
     "Y1": 'dw_Y1',
     "MON1": 'dw_MON1',
+    "jgy": 'jgy',
     "future": 'ok_future'
 }
 
@@ -28,6 +29,7 @@ mongo_url = 'mongodb://' + mdb["user"] + \
 conn = MongoClient(mongo_url)
 sdb = conn[mdb["db"]]
 ticker_coll = sdb[mdb["marketP1"]]
+ai_news_coll = sdb[mdb["jgy"]]
 dwM1_coll = sdb[mdb["M1"]]
 dwM5_coll = sdb[mdb["M5"]]
 dwD1_coll = sdb[mdb["D1"]]

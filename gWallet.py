@@ -1,13 +1,13 @@
 #  -*- coding:utf-8 -*-
-
+from flask import render_template, request
 from app.app import create_app
 
 app = create_app()
 
 
-@app.route('/')
-def hello_world():
-    return 'Hello World!'
+@app.route("/")
+def index():
+    return render_template("index.html")
 
 
 if __name__ == '__main__':

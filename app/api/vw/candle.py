@@ -1,4 +1,4 @@
-from flask import jsonify, Blueprint
+from flask import jsonify, Blueprint, request
 from app.config.enums import Symbol
 from app.config.secure import mdb, sdb, ticker_coll
 
@@ -16,8 +16,10 @@ kline = Blueprint('candle', __name__)
 #     pass
 
 
-@kline.route('/vw/kline/<symbol>/<exchange>/<period>', methods=['GET'])
-def get_kline_info(symbol, exchange, period):
+# @kline.route('/vw/kline/<symbol>/<exchange>/<period>', methods=['GET'])
+# def get_kline_info(symbol, exchange, period):
+@kline.route('/vw/kline/', methods=['POST'])
+def get_kline_info():
     '''
 
     :param symbol: btc_usdt
@@ -25,6 +27,9 @@ def get_kline_info(symbol, exchange, period):
     :param period: M1 M5 h1
     :return: []
     '''
+    symbol = request.form.get('symbol')
+    exchange = request.form.get('exchange')
+    period = request.form.get('period')
     k_coll = sdb[mdb[period]]
     sym = Symbol.convert_to_stander_sym(symbol)
     k_query = {"sym": sym, "exchange": exchange}
