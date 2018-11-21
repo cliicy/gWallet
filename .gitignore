@@ -2,3 +2,7 @@
 *.log
 comm
 *.pyc
+app/__pycache__
+app/api/__pycache__
+app/api/vw/__pycache__
+app/config/__pycache__
