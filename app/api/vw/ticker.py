@@ -1,18 +1,19 @@
 from flask import jsonify, Blueprint
 import time
 import pandas as pd
-from app.config.old_secure import coll
+from app.config.secure import ticker_coll
 
 tickers = Blueprint('ticker', __name__)
 
 
+# only for test
 @tickers.route('/vw/tickers', methods=['GET'])
 def get_ticker_info():
     while True:
         try:
             ticker = []
             dd = {'ticker': ticker}
-            data = pd.DataFrame(list(coll.find()))
+            data = pd.DataFrame(list(ticker_coll.find()))
             data = data[['sym', 'Change', 'High', 'Low', 'Price', 'Volume']]
             dc = data.set_index('sym').T.to_dict('dict')
             for k, vdata in dc.items():

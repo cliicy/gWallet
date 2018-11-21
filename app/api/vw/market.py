@@ -1,7 +1,7 @@
 from flask import jsonify, Blueprint, request
-from app.config.enums import Symbol
+from app.config.enums import Symbol, STANDARD_SYMBOL_LIST
 from app.config.secure import ticker_coll, ai_news_coll
-
+from app.api.common.transfer_func import num_transfer
 
 # info = [
 #     {
@@ -53,12 +53,9 @@ def get_ai_news():
         return jsonify({'code': 200, "msg": "成功", "data": {"list": rdata}})
 
 
-@market.route('/vw/market/', methods=['POST'])
+@market.route('/vw/market', methods=['POST'])
 def get_market_info():
-    # symbol = request.form.get('symbol')
     exchange = request.form.get('exchange')
-    # sym = Symbol.convert_to_stander_sym(symbol)
-    # k_query = {"sym": sym, "exchange": exchange}
     k_query = {"exchange": exchange}
     data = ticker_coll.find(k_query)
     if data is None:
@@ -73,9 +70,39 @@ def get_market_info():
             dollP, rmbP = dd['Price'].split('≈')
             dd['Price'] = {'usd': '{0}{1}'.format('$', dollP), 'rmb': rmbP}
             # Volume换算成亿万单位
+            dd['Volume'] = num_transfer(dd['Volume'])
+
+            sym_id = 'Null'
+            sym = dd['sym']
+            if sym in STANDARD_SYMBOL_LIST:
+                sym_id = Symbol.get_stander_sym_id(sym)
+            dd['sym_id'] = sym_id
+            sub_sym = sym.split('/')
+            dd['Logo'] = '{0}{1}'.format(sub_sym[0].lower(), '.png')
+            dd.pop('_id')
+            rdata.append(dd)
+        return jsonify({'code': 200, "msg": "成功", "data": {"list": rdata}})
+    return jsonify(dd)
+
+
+def do_ticker_test():
+    k_query = {"exchange": 'huobi'}
+    data = ticker_coll.find(k_query)
+    if data is None:
+        print('error')
+    else:
+        rdata = []
+        for dd in data:
+            doll_L, rmb_L = dd['Low'].split('≈')
+            dd['Low'] = {'usd': '{0}{1}'.format('$', doll_L), 'rmb': rmb_L}
+            dollH, rmbH = dd['High'].split('≈')
+            dd['High'] = {'usd': '{0}{1}'.format('$', dollH), 'rmb': rmbH}
+            dollP, rmbP = dd['Price'].split('≈')
+            dd['Price'] = {'usd': '{0}{1}'.format('$', dollP), 'rmb': rmbP}
+            # Volume换算成亿万单位
             sdd = dd['Volume'].replace(',', '')
             sdd = sdd.replace('¥ ', '')
-            print(sdd)
+            # print(sdd)
             yi_dd = float(sdd) * 0.00000001
             wan_dd = float(sdd) * 0.0001
             if yi_dd > 1:
@@ -85,44 +112,17 @@ def get_market_info():
             else:
                 pass
             dd['Logo'] = 'huobi.jpg'
+            sym_id = 'Null'
+            sym = dd['sym']
+            if sym in STANDARD_SYMBOL_LIST:
+                sym_id = Symbol.get_stander_sym_id(sym)
+            dd['sym_id'] = sym_id
             dd.pop('_id')
             rdata.append(dd)
-        return jsonify({'code': 200, "msg": "成功", "data": {"list": rdata}})
-    return jsonify(dd)
+    print(rdata)
 
 
 if __name__ == '__main__':
     # data = {"exchange": "huobi", "sym": "btc_usdt", }
-    # r = request.post('http://127.0.0.1:5000/kline', data)
-    # print(r.status_code)
-    # print(r.headers['content-type'])
-    # print(r.encoding)
-    # print(r.text)
+    do_ticker_test()
     pass
-    # # data = ai_news_coll.find()
-    # k_query = {"sym": 'ETC/USDT', "exchange": 'huobi'}
-    # data = ticker_coll.find(k_query)
-    # if data is None:
-    #     print('error')
-    # else:
-    #     rdata = []
-    #     for dd in data:
-    #         # dollars, rmb = dd['Low'].split(r'≈')
-    #         # dd['Low'] = {'usd': dollars, 'rmb': rmb}
-    #         print(dd['Volume'])
-    #         # dd['Volume'] = dd['Volume'].replace(',', '')
-    #         sdd = dd['Volume'].replace(',', '')
-    #         sdd = sdd.replace('¥ ', '')
-    #         print(sdd)
-    #         yi_dd = float(sdd)*0.000000001
-    #         wan_dd = float(sdd)*0.0001
-    #
-    #         if yi_dd > 1:
-    #             dd['Volume'] = '{0}{1}'.format(round(yi_dd, 1), '亿')
-    #         elif wan_dd > 1:
-    #             dd['Volume'] = '{0}{1}'.format(round(wan_dd, 1), '万')
-    #         else:
-    #             pass
-    #         dd.pop('_id')
-    #         rdata.append(dd)
-    #     print(rdata)

@@ -3,11 +3,12 @@ from enum import Enum
 
 SYMBOL_LIST = ['btc_usdt', 'bch_usdt', 'eth_usdt', 'ltc_usdt', 'eos_usdt', 'eth_btc', 'eos_btc', 'xrpusdt']
 STANDARD_SYMBOL_LIST = ["BTC/USDT", "BCH/USDT", "ETH/USDT", "LTC/USDT", "EOS/USDT", "ETH/BTC", "EOS/BTC",
-                        "XRP/USDT", "BCH/BTC", "LTC/BTC",  "XRP/BTC", "BCH/ETH",  "LTC/ETH", "EOS/ETH", "XRP/ETH"]
+                        "XRP/USDT", "BCC/USDT", "ETC/USDT", "BCH/BTC", "LTC/BTC",  "XRP/BTC", "BCH/ETH",
+                        "LTC/ETH", "EOS/ETH", "XRP/ETH"]
+
 
 STANDARD_PERIOD_LIST = ["M1", "M5", "M15", "M30", "H1", "D1", "W1", "MON1", "Y1"]
 MONGODB_PERIOD_DOC = ['dw_M1', 'dw_M5', 'dw_M15', 'dw_M30', 'dw_H1', 'dw_D1', 'dw_W1', 'dw_MON1', 'dw_Y1']
-# MONGODB_PERIOD_DOC = ["dw_M1", "dw_M5", "dw_M15", "dw_M30", "dw_H1", "dw_D1", "dw_W1", "dw_MON1", "dw_Y1"]
 
 
 class Symbol(Enum):
@@ -21,7 +22,8 @@ class Symbol(Enum):
     EOS_USDT = 4
     ETH_BTC = 5
     EOS_BTC = 6
-    BCC_USDT = 7
+    XRP_USDT = 7
+    BCC_USDT = 8
 
     @staticmethod
     def convert_to_period_doc(period):
@@ -42,6 +44,16 @@ class Symbol(Enum):
         """
         index = SYMBOL_LIST.index(symbol)
         return STANDARD_SYMBOL_LIST[index]
+
+    @staticmethod
+    def get_stander_sym_id(symbol):
+        """
+        获得标准的存在与mongodb中的货币对
+        :param symbol:
+        :return:
+        """
+        index = STANDARD_SYMBOL_LIST.index(symbol)
+        return index
 
 
 if __name__ == '__main__':
