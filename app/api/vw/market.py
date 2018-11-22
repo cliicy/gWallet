@@ -1,8 +1,8 @@
 from flask import jsonify, Blueprint, request
 from app.config.enums import Symbol, STANDARD_SYMBOL_LIST
-from app.config.secure import ticker_coll, ai_news_coll
+from app.config.secure import ticker_coll, ai_news_coll, logo_coll
 from app.api.common.transfer_func import num_transfer
-
+# import os
 # info = [
 #     {
 #         '交易所': 'Fcoin',
@@ -21,6 +21,16 @@ from app.api.common.transfer_func import num_transfer
 # ]
 
 market = Blueprint('market', __name__)
+logo_list = {}
+
+
+def get_coin_logo():
+    if len(logo_list) == 0:
+        logo_data = logo_coll.find()
+        for ones in logo_data:
+            logo_list[ones['sym']] = {'Logo': ones['Logo'], 'id': ones['sym_id']}
+    else:
+        print('pass to get logo')
 
 
 @market.route("/login", methods=['GET', 'POST'])
@@ -61,6 +71,7 @@ def get_market_info():
     if data is None:
         return jsonify({'code：': 'Error'})
     else:
+        get_coin_logo()
         rdata = []
         for dd in data:
             doll_L, rmb_L = dd['Low'].split('≈')
@@ -71,14 +82,14 @@ def get_market_info():
             dd['Price'] = {'usd': '{0}{1}'.format('$', dollP), 'rmb': rmbP}
             # Volume换算成亿万单位
             dd['Volume'] = num_transfer(dd['Volume'])
-
-            sym_id = 'Null'
             sym = dd['sym']
+            sub_sym = sym.split('/')[0]
+            if sub_sym in logo_list:
+                dd_sym = logo_list[sub_sym]
+                dd['Logo'] = dd_sym['Logo']
+                dd['sym_id'] = dd_sym['id']
             if sym in STANDARD_SYMBOL_LIST:
-                sym_id = Symbol.get_stander_sym_id(sym)
-            dd['sym_id'] = sym_id
-            sub_sym = sym.split('/')
-            dd['Logo'] = '{0}{1}'.format(sub_sym[0].lower(), '.png')
+                dd['sym_id'] = Symbol.get_stander_sym_id(sym)
             dd.pop('_id')
             rdata.append(dd)
         return jsonify({'code': 200, "msg": "成功", "data": {"list": rdata}})
@@ -89,8 +100,9 @@ def do_ticker_test():
     k_query = {"exchange": 'huobi'}
     data = ticker_coll.find(k_query)
     if data is None:
-        print('error')
+        print('Error')
     else:
+        get_coin_logo()
         rdata = []
         for dd in data:
             doll_L, rmb_L = dd['Low'].split('≈')
@@ -100,23 +112,16 @@ def do_ticker_test():
             dollP, rmbP = dd['Price'].split('≈')
             dd['Price'] = {'usd': '{0}{1}'.format('$', dollP), 'rmb': rmbP}
             # Volume换算成亿万单位
-            sdd = dd['Volume'].replace(',', '')
-            sdd = sdd.replace('¥ ', '')
-            # print(sdd)
-            yi_dd = float(sdd) * 0.00000001
-            wan_dd = float(sdd) * 0.0001
-            if yi_dd > 1:
-                dd['Volume'] = '{0}{1}'.format(round(yi_dd, 1), '亿')
-            elif wan_dd > 1:
-                dd['Volume'] = '{0}{1}'.format(round(wan_dd, 1), '万')
-            else:
-                pass
-            dd['Logo'] = 'huobi.jpg'
-            sym_id = 'Null'
+            dd['Volume'] = num_transfer(dd['Volume'])
             sym = dd['sym']
+            sub_sym = sym.split('/')[0]
+            if sub_sym in logo_list:
+                dd_sym = logo_list[sub_sym]
+                dd['Logo'] = dd_sym['Logo']
             if sym in STANDARD_SYMBOL_LIST:
-                sym_id = Symbol.get_stander_sym_id(sym)
-            dd['sym_id'] = sym_id
+                dd['sym_id'] = Symbol.get_stander_sym_id(sym)
+            else:
+                dd['sym_id'] = dd_sym['id']
             dd.pop('_id')
             rdata.append(dd)
     print(rdata)

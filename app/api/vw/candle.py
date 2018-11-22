@@ -129,7 +129,7 @@ def do_kline_tt():
             mk_info['Price'] = {'usd': '{0}{1}'.format('$', dollP), 'rmb': rmbP}
             gapd = float(dollP) * float(change[1:-1])
             ss = '-$' if change[0] == '-' else '$'
-            mk_info['gap'] = '{0}{1}'.format(ss, gapd)
+            mk_info['gap'] = '{0}{1}'.format(ss, round(gapd, 4))
             mk_info['Volume'] = num_transfer(ret['Volume'])
     print(rdata)
     print(mk_info)
