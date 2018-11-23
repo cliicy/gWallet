@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, url_for
 
 
 def register_blueprints(app):
