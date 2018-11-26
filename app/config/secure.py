@@ -19,6 +19,7 @@ mdb = {
     "M1": 'dw_M1',
     "Y1": 'dw_Y1',
     "MON1": 'dw_MON1',
+    "depth": 'dw_depth',
     "jgy": 'jgy',
     "coin_logo": 'dw_coin_logo',
     "feixiaohao": 'dw_fxh',
@@ -40,3 +41,4 @@ dwW1_coll = sdb[mdb["W1"]]
 future_kline_coll = sdb[mdb["future"]]
 logo_coll = sdb[mdb["coin_logo"]]
 fxh_coll = sdb[mdb["feixiaohao"]]
+depth_coll = sdb[mdb["depth"]]
