@@ -22,3 +22,12 @@ def get_trades_info(exchange, symbol):
     # print(exchange)
     dd = {'trades': {'exchange': exchange, 'symbol': symbol, 'information': details}}
     return jsonify(dd)
+
+
+if __name__ == '__main__':
+    a = 1
+    import pdb
+    pdb.set_trace()
+    b = 2
+    c = a+b
+    print(c)

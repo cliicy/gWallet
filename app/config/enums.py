@@ -55,6 +55,14 @@ class Symbol(Enum):
         index = STANDARD_SYMBOL_LIST.index(symbol)
         return index
 
+    @staticmethod
+    def get_stander_symbol(req_para):
+        if req_para == '':
+            return ''
+        sym_id = int(req_para)
+        assert (sym_id < len(STANDARD_SYMBOL_LIST))
+        return STANDARD_SYMBOL_LIST[sym_id]
+
 
 if __name__ == '__main__':
     pass

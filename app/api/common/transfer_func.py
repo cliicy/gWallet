@@ -1,4 +1,6 @@
 import time
+import datetime
+from datetime import datetime
 
 
 def time_stamp(ts):
@@ -30,3 +32,27 @@ def num_transfer(num):
     return vol
 
 
+def timestamp_to_timestamp10(time_stamp):
+    time_stamp = int(time_stamp * (10 ** (10 - len(str(time_stamp)))))
+    return time_stamp
+
+
+def timestamp_to_datetime_m(time_stamp):
+    time_stamp = int(time_stamp * (10 ** (10 - len(str(time_stamp)))))
+    time_local = time.localtime(time_stamp)
+    tm = time.strftime("%Y-%m-%d %H:%M", time_local)
+    return tm
+
+
+def time_to_timestamp(time):
+    stamp = int(time.mktime(time.timetuple())) * 1000
+    return stamp
+
+
+def strtime_to_today_timestamp(st):
+    today = datetime.date.today().strftime("%Y/%m/%d ")
+    st = today + st
+    _time = datetime.datetime.strptime(st, "%Y/%m/%d %H:%M:%S")
+    t = _time.timetuple()
+    ts = int(time.mktime(t))*1000
+    return ts

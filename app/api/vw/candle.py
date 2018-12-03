@@ -1,5 +1,5 @@
 from flask import jsonify, Blueprint, request
-from app.config.enums import STANDARD_SYMBOL_LIST
+from app.config.enums import Symbol, STANDARD_SYMBOL_LIST
 from app.config.secure import mdb, sdb, ticker_coll, dwD1_coll
 from app.api.common.transfer_func import time_stamp, num_transfer
 
@@ -43,15 +43,12 @@ def get_kline_info():
     :param period: M1 M5 h1
     :return: []
     '''
-    symbol = request.form.get('symbol')
+    sym_id = request.form.get('sym_id')
+    symbol = Symbol.get_stander_symbol(sym_id)
     exchange = request.form.get('exchange')
     period = request.form.get('period')
     k_coll = sdb[mdb[period]]
-    # sym = Symbol.convert_to_stander_sym(symbol)
-    sym_id = int(symbol)
-    assert(sym_id <= len(STANDARD_SYMBOL_LIST))
-    sym = STANDARD_SYMBOL_LIST[sym_id]
-    k_query = {"sym": sym, "exchange": exchange}
+    k_query = {"sym": symbol, "exchange": exchange}
     data = k_coll.find(k_query).sort("ts", 1)
 
     if data is None:
@@ -60,7 +57,7 @@ def get_kline_info():
         rdata = []
         # 设置5日/10日/30日 均线
         avg_dd = {}
-        set_ma_value(sym, exchange, avg_dd)
+        set_ma_value(symbol, exchange, avg_dd)
         for dd in data:
             dd['sym_id'] = sym_id
             dd['ts'] = time_stamp(dd['ts'])
