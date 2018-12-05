@@ -149,8 +149,8 @@ class HuobiUtil(SignatureUtil):
         REST_api_reference#post-v1orderordersplace-pro%E7%AB%99%E4%B8%8B%E5%8D%95
         buy-market：市价买, sell-market：市价卖, buy-limit：限价买, sell-limit：限价卖
         """
-        # pass
         try:
+            acct_id = 0
             if 'account_id' in args:
                 acct_id = args['account_id']
             else:
@@ -158,7 +158,6 @@ class HuobiUtil(SignatureUtil):
                 acct_id = accounts['data'][0]['id']
         except BaseException as e:
             print('get acct_id error.%s' % e)
-            acct_id = 0
         symbol = ''
         if "symbol" in args:
             symbol = args["symbol"]
@@ -190,6 +189,39 @@ class HuobiUtil(SignatureUtil):
             result_json = HttpCommunicator.http_post(self, url, params, headers)
             print(result_json)
             ret = result_json
+        except BaseException as e:
+            ret = e
+        finally:
+            return ret
+
+    def get_order(self, **args):
+        """
+        查询订单信息
+         :param order_id:
+          :return:
+        """
+        params = {}
+        url = "/v1/order/orders/"
+        try:
+            if "order_id" in args:
+                url = "/v1/order/orders/{0}".format(args["order_id"])
+            if "api_key" in args:
+                params.update({'ACCESS_KEY': args["api_key"]})
+            if "sym" in args:
+                params.update({'sym': args['sym']})
+            if "api_secret" in args:
+                params.update({'SECRET_KEY': args["api_secret"]})
+            if "types" in args:
+                params.update({'types': args["types"]})
+        except BaseException as e:
+            print('get acct_id error.%s' % e)
+        params.update({"states": 'submitted'})
+        print('传入的请求参数：', params)
+        url, params, headers = HuobiUtil.api_key_get_params_prepare(self, params, url)
+        ret = None
+        try:
+            ret = HttpCommunicator.http_get(self, url, params, headers)
+            print(ret)
         except BaseException as e:
             ret = e
         finally:

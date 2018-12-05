@@ -5,6 +5,7 @@ from app.config.secure import ticker_coll, ai_news_coll, logo_coll, fxh_coll, de
 from app.api.common.transfer_func import num_transfer
 from app.api.common.utils import get_apikeys
 from app.api.common.huobi_util import HuobiUtil, place_type
+import json
 
 market = Blueprint('market', __name__)
 logo_list = {}
@@ -298,7 +299,7 @@ def get_depth_info():
                         if acc['data']['type'] == 'spot':
                             if acc['data']['state'] == 'working':
                                 if info['type'] == 'trade':
-                                    print('&&&&&&&&&&& ', info)
+                                    # print('&&&&&&&&&&& ', info)
                                     balance = info['balance']
                                     acc_id_list.append(acc['data']['id'])
                                     break
@@ -337,11 +338,39 @@ def get_depth_info():
             ret['data'].update(dd_data)
             ret['data']['list_sell_out'] = sell_data
             ret['data']['list_buying'] = buy_data
-            ret['data']['list_Limit'] = [{'limit_name': lt_name, 'limit_date': lt_date,
-                                          'entrustment_num': ent_num, 'make_deal__num': deal_num,
-                                          'entrustment_price': ent_price, 'cancel_orderstate': cancel_yn}]
+
+            # 获取所有提交的订单信息
+            ex_id = EXCHANGE_LIST.index(exchange.upper()) + 1
+            sym = Symbol.convert_to_platform_symbol(str(ex_id), symbol)
+            types = ''
+            for item in place_type:
+                types += item + ','
+            types = types.rstrip(',')
+            od_info = {}
+            try:
+                orders_ret = HuobiUtil().get_order(sym=sym, types=types, api_key=key_info[0], api_secret=key_info[1])
+                if len(orders_ret['data']):
+                    rdata = orders_ret['data']
+                    lt_name = rdata['type']
+                    lt_date = rdata['created-at']
+                    ent_num = orders_ret('field-amount')
+                    deal_num = orders_ret('field-cash-amount')
+                    ent_price = orders_ret('price')
+                    status = orders_ret('state')
+                    cancel_yn = 'Y'
+                    if status == 'filled' or status == 'canceled':
+                        cancel_yn = 'N'
+            except BaseException as e:
+                od_info.update({'msg': e})
+            finally:
+                od_info.update({'limit_name': lt_name})
+                od_info.update({'limit_date': lt_date})
+                od_info.update({'entrustment_num': ent_num})
+                od_info.update({'make_deal__num': deal_num})
+                od_info.update({'entrustment_price': ent_price})
+                od_info.update({'cancel_orderstate': cancel_yn})
+                ret['data']['list_Limit'] = [od_info]
         return jsonify(ret)
-        # print(ret)
 
 
 @market.route('/vw/trade', methods=['POST'])
@@ -403,36 +432,43 @@ def do_trade():
 # #         print(ret)
 # #
 # #
-# # def do_place():
-# #     exchange = 'huobi'
-# #     sym_id = '0'
-# #     print('sym_id= ', sym_id)
-# #     symbol = Symbol.get_stander_symbol(sym_id)
-# #     ex_id = EXCHANGE_LIST.index(exchange.upper()) + 1
-# #     sym = Symbol.convert_to_platform_symbol(str(ex_id), symbol)
-# #     # trade_flag = request.form.get('flag')
-# #     trade_flag = 0
-# #     trade_flag = place_type[int(trade_flag)]
-# #     price = 5000
-# #     num = 0.001
-# #     keys_data = keys_coll.find_one({"exchange": exchange})
-# #     key_info = get_apikeys(keys_data)
-# #     ret = {'code': 200, "msg": "成功"}
-# #     if len(acc_id_list):
-# #         pass
-# #     else:
-# #         accounts = HuobiUtil().get_accounts(key_info)
-# #         if accounts['status'] == 'error':
-# #             ret.update({'status': accounts})
-# #             ret['msg'] = '失败'
-# #             ret.pop('code')
-# #         else:
-# #             acc_id_list.append(accounts['data'][0]['id'])
-# #     place_ret = HuobiUtil().place(symbol=sym, trade_flag=trade_flag, price=price, amount=num,
-# #                                   account_id=acc_id_list[0], api_key=key_info[0], api_secret=key_info[1])
-# #     ret.update({'status': place_ret})
-# #     ret['msg'] = place_ret
-# #     print(ret)
+def do_place():
+    exchange = 'huobi'
+    sym_id = '0'
+    print('sym_id= ', sym_id)
+    symbol = Symbol.get_stander_symbol(sym_id)
+    ex_id = EXCHANGE_LIST.index(exchange.upper()) + 1
+    sym = Symbol.convert_to_platform_symbol(str(ex_id), symbol)
+    # trade_flag = request.form.get('flag')
+    trade_flag = 0
+    trade_flag = place_type[int(trade_flag)]
+    price = 5000
+    num = 0.001
+    keys_data = keys_coll.find_one({"exchange": exchange})
+    # key_info = get_apikeys(keys_data)
+    key_info = ['a4eedce3-e30efad5-fad65169-d0704', '2f1c0132-89e3c837-84bd6370-bbdc5']
+    ret = {'code': 200, "msg": "成功"}
+    if len(acc_id_list):
+        pass
+    else:
+        # accounts = HuobiUtil().get_accounts(key_info)
+        accounts = {'status': 'ok', 'data': [{'id': 5632276}]}
+        if accounts['status'] == 'error':
+            ret.update({'status': accounts})
+            ret['msg'] = '失败'
+            ret.pop('code')
+        else:
+            acc_id_list.append(accounts['data'][0]['id'])
+    # place_ret = HuobiUtil().place(symbol=sym, trade_flag=trade_flag, price=price, amount=num,
+    #                               account_id=acc_id_list[0], api_key=key_info[0], api_secret=key_info[1])
+    types = ''
+    for item in place_type:
+        types += item + ','
+    types = types.rstrip(',')
+    place_ret = HuobiUtil().get_order(sym=sym, types=types, api_key=key_info[0], api_secret=key_info[1])
+    ret.update({'status': place_ret})
+    ret['msg'] = place_ret
+    print(ret)
 
 
 if __name__ == '__main__':
@@ -453,7 +489,7 @@ if __name__ == '__main__':
     #                               account_id=4461503, api_key=key_info[0], api_secret=key_info[1])
     # keys_data = keys_coll.find_one({"exchange": 'huobi'})
     # key_info = get_apikeys(keys_data)
-    # do_place()
+    do_place()
     # do_trade()
     # get_exchange_rate()
     # test----
