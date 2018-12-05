@@ -24,6 +24,8 @@ mdb = {
     "MON1": 'dw_MON1',
     "depth": 'dw_depth',
     "api_secret": 'accounts',
+    "rate": 'dw_currency_rate',
+    "market_detail": 'dw_ticker_detail',
     "jgy": 'jgy',
     "coin_logo": 'dw_coin_logo',
     "feixiaohao": 'dw_fxh',
@@ -47,6 +49,8 @@ logo_coll = sdb[mdb["coin_logo"]]
 fxh_coll = sdb[mdb["feixiaohao"]]
 depth_coll = sdb[mdb["depth"]]
 keys_coll = sdb[mdb["api_secret"]]
+rate_coll = sdb[mdb["rate"]]
+detail_coll = sdb[mdb["market_detail"]]
 
 
 class MonitoringAlarmConfig(object):

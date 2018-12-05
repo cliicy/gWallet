@@ -2,7 +2,7 @@
 from app.api.common.signature_util import SignatureUtil
 from app.api.communicators import HttpCommunicator
 from app.config.secure import huobi_setting
-
+import operator as op
 import base64
 import datetime
 import hashlib
@@ -59,7 +59,6 @@ class HuobiUtil(SignatureUtil):
         url = host_url + request_path
         headers_get = huobi_setting['GET_HEADERS']
         return url, params, headers_get
-        #return http_get_request(url, params)
 
     def api_key_post_params_prepare(self,params, request_path):
 
@@ -88,8 +87,7 @@ class HuobiUtil(SignatureUtil):
         url = host_url + request_path + '?' + urllib.parse.urlencode(params_to_sign)
         headers_post = huobi_setting['POST_HEADERS']
 
-        return url, json.dumps(params),headers_post
-        #return http_post_request(url, params)
+        return url, json.dumps(params), headers_post
 
     def createSign(self, pParams, method, host_url, request_path, secret_key):
 
@@ -123,22 +121,79 @@ class HuobiUtil(SignatureUtil):
         :param acc_info:
         :return:
         """
-        # / v1 / account / accounts / {account - id} / balance
-        # acc_id = []
         rbalance = []
-        ret = self.get_accounts(acc_info)
-        # print('获取到的账户信息：', ret)
-        for item in ret['data']:
-            path = '{}/{}/{}'.format("/v1/account/accounts", item['id'], "balance")
-            # print('获取到的账户信息中的ID和path：', path)
-            params = {}
-            params.update({'ACCESS_KEY': acc_info[0], 'SECRET_KEY': acc_info[1]})
-            url, params, headers_post = HuobiUtil.api_key_get_params_prepare(self, params, path)
-            # print('要查询账户余额信息的参数：', params)
-            rdata = HttpCommunicator.http_get(self, url=url, params=params, headers=headers_post)
-            print('获取到的账户[{0}]余额信息：{1}'.format(item['id'], rdata))
-            rbalance.append(rdata)
-        return rbalance
+        try:
+            ret = self.get_accounts(acc_info)
+            # print('获取到的账户信息：', ret)
+            for item in ret['data']:
+                path = '{}/{}/{}'.format("/v1/account/accounts", item['id'], "balance")
+                # print('获取到的账户信息中的ID和path：', path)
+                params = {}
+                params.update({'ACCESS_KEY': acc_info[0], 'SECRET_KEY': acc_info[1]})
+                url, params, headers_post = HuobiUtil.api_key_get_params_prepare(self, params, path)
+                # print('要查询账户余额信息的参数：', params)
+                rdata = HttpCommunicator.http_get(self, url=url, params=params, headers=headers_post)
+                print('获取到的账户[{0}]余额信息：{1}'.format(item['id'], rdata))
+                rbalance.append(rdata)
+        except EnvironmentError as e:
+            print(e)
+            rbalance.append(e)
+        finally:
+            return rbalance
+
+    def place(self, **args):
+        """
+        下单
+        https://github.com/huobiapi/API_Docs/wiki/
+        REST_api_reference#post-v1orderordersplace-pro%E7%AB%99%E4%B8%8B%E5%8D%95
+        buy-market：市价买, sell-market：市价卖, buy-limit：限价买, sell-limit：限价卖
+        """
+        # pass
+        try:
+            if 'account_id' in args:
+                acct_id = args['account_id']
+            else:
+                accounts = HuobiUtil.get_accounts(self)
+                acct_id = accounts['data'][0]['id']
+        except BaseException as e:
+            print('get acct_id error.%s' % e)
+            acct_id = 0
+        symbol = ''
+        if "symbol" in args:
+            symbol = args["symbol"]
+        if "amount" in args:
+            amount = args["amount"]
+        if "price" in args:
+            price = args["price"]
+        if "trade_flag" in args:
+            flag = args["trade_flag"]
+        if "api_key" in args:
+            api_key = args["api_key"]
+        if "api_secret" in args:
+            api_secret = args["api_secret"]
+        params = {
+              "amount": amount,
+              "symbol": symbol,
+              "type": type,
+              "price": price,
+              "source": ''
+        }
+
+        params.update({"account-id": acct_id, "type": flag})
+        params.update({'ACCESS_KEY': api_key, 'SECRET_KEY': api_secret})
+        order_place_url = huobi_setting['ORDER_PLACE_URL']
+        # 代签名post请求，参数准备
+        url, params, headers = HuobiUtil.api_key_post_params_prepare(self, params, order_place_url)
+        # print(url, params, headers)
+        ret = None
+        try:
+            result_json = HttpCommunicator.http_post(self, url, params, headers)
+            print(result_json)
+            ret = result_json
+        except BaseException as e:
+            ret = e
+        finally:
+            return ret
 
 
 if __name__ == '__main__':

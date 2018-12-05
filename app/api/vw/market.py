@@ -1,13 +1,16 @@
 from flask import jsonify, Blueprint, request
-from app.config.enums import Symbol, STANDARD_SYMBOL_LIST
-from app.config.secure import ticker_coll, ai_news_coll, logo_coll, fxh_coll, depth_coll, keys_coll
+from app.config.enums import Symbol, STANDARD_SYMBOL_LIST, Platform, EXCHANGE_LIST
+from app.config.secure import ticker_coll, ai_news_coll, logo_coll, fxh_coll, depth_coll, keys_coll, \
+    rate_coll, detail_coll
 from app.api.common.transfer_func import num_transfer
-from app.api.common.transfer_func import time_stamp
-from app.api.common.utils import get_keys
+from app.api.common.utils import get_apikeys
 from app.api.common.huobi_util import HuobiUtil
 
 market = Blueprint('market', __name__)
 logo_list = {}
+exchange_id_list = {}
+acc_id_list = []
+account_info = {}
 ip_prefix = 'http://10.0.72.91:5000'
 
 
@@ -30,6 +33,36 @@ def get_coin_logo():
     else:
         pass
         # print('pass to get logo')
+
+
+@market.route("/vw/rate", methods=['POST'])
+def get_exchange_rate():
+    # exchange = request.form.get('exchange')
+    exchange = 'huobi'
+    k_query = {'exchange': exchange}
+    data = []
+    ret = {'rate_list': data}
+    get_coin_logo()
+    cc = 0
+    rate_data = rate_coll.find(k_query)
+    for ones in rate_data:
+        data.append({ones['sym']: ones['rate']})
+    for keys, values in logo_list.items():
+        if cc > len(STANDARD_SYMBOL_LIST):
+            break
+        sym = '{0}{1}'.format(keys, '/USDT')
+        if sym in STANDARD_SYMBOL_LIST:
+            info = {}
+            info['logo'] = values['Logo']
+            k_query.update({'sym': sym})
+            rt = detail_coll.find_one(k_query)
+            if rt is None:
+                continue
+            info[keys] = rt['Price']
+            data.append(info)
+            cc += 1
+    return jsonify(ret)
+    # print(ret)
 
 
 @market.route("/login", methods=['GET', 'POST'])
@@ -104,7 +137,12 @@ def get_exchange_list():
                 dd.pop('_id')
                 dd.pop('api')
                 rdata.append(dd)
+                ex_id = dd['id']
+                ex_name = dd['exchange']
+                if ex_name not in exchange_id_list:
+                    exchange_id_list.update({ex_name: ex_id})
             ret['data']['list'] = rdata
+            # print(exchange_id_list)
         return jsonify(ret)
 
 
@@ -194,10 +232,10 @@ def get_market_info():
         return jsonify(ret)
 
 
-@market.route('/vw/trade', methods=['POST'])
-def get_trade_info():
+@market.route('/vw/depth', methods=['POST'])
+def get_depth_info():
     """
-    交易管理接口 要提供给前端depth的部分信息及账户余额信息
+    交易页面获取数据接口 要提供给前端depth的部分信息及账户余额信息
     :return:
     """
     # sym_id = '0'
@@ -210,31 +248,32 @@ def get_trade_info():
     cancel_yn = request.form.get('yn_cancel')
     exchange = request.form.get('exchange')
     sym_id = request.form.get('sym_id')
+    total_amount = request.form.get('total_sum')
     symbol = Symbol.get_stander_symbol(sym_id)
     k_query = {"exchange": exchange, "sym": symbol}
     data = depth_coll.find(k_query).sort("ts", -1).limit(5)
     keys_data = keys_coll.find_one({"exchange": exchange})
-    key_info = get_keys(keys_data)
+    key_info = get_apikeys(keys_data)
     # 获取此账户及其下各个子账户中的所有拥有此币种的所有余额信息
     acc_ret = HuobiUtil().get_account_balance(key_info)
-    balance = {}
+    print('账户信息：', acc_ret)
+    bal = request.form.get('bal')  # 只是设置初始值为null
+    balance = bal
     if len(acc_ret) > 0:
-        balance_list = []
         sym = symbol.split('/')[0].lower()
         for acc in acc_ret:
-            balance['status'] = acc['status']
+            # balance['status'] = acc['status']
             if acc['status'] == 'ok':
                 coin_list = acc['data']['list']
                 for info in coin_list:
                     if sym == info['currency']:
-                        info['account_id'] = acc['data']['id']
-                        info['account_type'] = acc['data']['type']
-                        info['state'] = acc['data']['state']
-                        balance_list.append(info)
-            balance['list'] = balance_list
-    else:
-        balance['status'] = 'error'
-    # print(key_info)
+                        if acc['data']['type'] == 'spot':
+                            if acc['data']['state'] == 'working':
+                                if info['type'] == 'trade':
+                                    print('&&&&&&&&&&& ', info)
+                                    balance = info['balance']
+                                    acc_id_list.append(acc['data']['id'])
+                                    break
     if data is None:
         return jsonify({'code：': 'Error'})
         # print('Error')
@@ -252,21 +291,19 @@ def get_trade_info():
                 vol_usd = float(vol_rmb[2:])/6.9  # 暂时定为6.9
                 vol = num_transfer(vol_rmb)
                 vol_usd = num_transfer(str(vol_usd))
-                # rmbP = rt['Price'].split('≈')[1]
-                # delta = rt["Change"].rstrip('%')
-                # change = float(delta)*float(rmbP.replace(' ¥', ''))
                 change = rt["Change"]
                 dd_data['flag'] = 0 if change[0] == '-' else 1
                 dd_data['Vol_RMB'] = vol
                 dd_data['Vol_USD'] = vol_usd
                 dd_data['Change'] = change
-                dd_data['avaiable'] = balance
+                dd_data['AvaiableNum'] = balance
+                dd_data['MakeDealPrice'] = total_amount
             buy_data = []
             sell_data = []
             for dd in data:
                 get_sym_id_log(symbol, dd)
                 dd['delta'] = change
-                ts = time_stamp(dd['ts'])
+                # ts = time_stamp(dd['ts'])
                 buy_data.append({'buy_price': str(dd['buy_price']), 'buy_amt': str(dd['buy_amt'])})  # , 'ts': ts
                 sell_data.append({'sell_price': str(dd['sell_price']), 'sell_amt': str(dd['sell_amt'])})  # , 'ts': ts
             ret['data'].update(dd_data)
@@ -279,87 +316,44 @@ def get_trade_info():
         # print(ret)
 
 
-@market.route('/vw/depth', methods=['POST'])
-def get_depth_info():
+@market.route('/vw/trade', methods=['POST'])
+def do_trade():
     """
-    交易管理接口 要提供给前端depth的部分信息及账户余额信息
-    :return:
+    交易管理接口 从前端接收交易价格和数量后 调用交易api
+    入参{"exchang":"交易所名字"  "sym_id":"货币对id" "flag":"买卖标识，0买，1卖"
+         "price":"价格" "num":"数量"
     """
-    pass
     # sym_id = '0'
-    # exchange = 'huobi'
-    # lt_name = request.form.get('limit_name')
-    # lt_date = request.form.get('limit_date')
-    # ent_num = request.form.get('num')
-    # deal_num = request.form.get('deal_num')
-    # ent_price = request.form.get('ent_price')
-    # cancel_yn = request.form.get('yn_cancel')
-    # exchange = request.form.get('exchange')
-    # sym_id = request.form.get('sym_id')
-    # symbol = Symbol.get_stander_symbol(sym_id)
-    # k_query = {"exchange": exchange, "sym": symbol}
-    # data = depth_coll.find(k_query).sort("ts", -1).limit(5)
-    # keys_data = keys_coll.find_one({"exchange": exchange})
-    # key_info = get_keys(keys_data)
-    # # 获取此账户及其下各个子账户中的所有拥有此币种的所有余额信息
-    # acc_ret = HuobiUtil().get_account_balance(key_info)
-    # balance = {}
-    # if len(acc_ret) > 0:
-    #     balance_list = []
-    #     sym = symbol.split('/')[0].lower()
-    #     for acc in acc_ret:
-    #         balance['status'] = acc['status']
-    #         if acc['status'] == 'ok':
-    #             coin_list = acc['data']['list']
-    #             for info in coin_list:
-    #                 if sym == info['currency']:
-    #                     balance_list.append(info)
-    #         balance['list'] = balance_list
-    # else:
-    #     balance['status'] = 'error'
-    # print(key_info)
-    # if data is None:
-    #     return jsonify({'code：': 'Error'})
-    #     # print('Error')
-    # else:
-    #     ret = {'code': 200, "msg": "成功", "data": {}}
-    #     count = data.count()
-    #     if count > 0:
-    #         get_coin_logo()
-    #         dd_data = {}
-    #         rt = ticker_coll.find_one(k_query)
-    #         if rt is None:
-    #             pass
-    #         else:
-    #             vol_rmb = rt['Volume'].replace(',', '')
-    #             vol_usd = float(vol_rmb[2:])/6.9  # 暂时定为6.9
-    #             vol = num_transfer(vol_rmb)
-    #             vol_usd = num_transfer(str(vol_usd))
-    #             # rmbP = rt['Price'].split('≈')[1]
-    #             # delta = rt["Change"].rstrip('%')
-    #             # change = float(delta)*float(rmbP.replace(' ¥', ''))
-    #             change = rt["Change"]
-    #             dd_data['flag'] = 0 if change[0] == '-' else 1
-    #             dd_data['Vol_RMB'] = vol
-    #             dd_data['Vol_USD'] = vol_usd
-    #             dd_data['Change'] = change
-    #             # dd_data['avaiable'] = balance
-    #         buy_data = []
-    #         sell_data = []
-    #         for dd in data:
-    #             get_sym_id_log(symbol, dd)
-    #             dd['delta'] = change
-    #             ts = time_stamp(dd['ts'])
-    #             buy_data.append({'buy_price': str(dd['buy_price']), 'buy_amt': str(dd['buy_amt'])})  # , 'ts': ts
-    #             sell_data.append({'sell_price': str(dd['sell_price']), 'sell_amt': str(dd['sell_amt'])})  # , 'ts': ts
-    #         ret['data'].update(dd_data)
-    #         ret['data']['list_sell_out'] = sell_data
-    #         ret['data']['list_buying'] = buy_data
-    #         ret['data']['list_Limit'] = [{'limit_name': lt_name, 'limit_date': lt_date,
-    #                                       'entrustment_num': ent_num, 'make_deal__num': deal_num,
-    #                                       'entrustment_price': ent_price, 'cancel_orderstate': cancel_yn}]
-    #     return jsonify(ret)
-        # print(ret)
+    # exchange = 'huobi'.upper()
+    exchange = request.form.get('exchange')
+    sym_id = request.form.get('sym_id')
+    print(sym_id)
+    symbol = Symbol.get_stander_symbol(sym_id)
+    ex_id = EXCHANGE_LIST.index(exchange.upper()) + 1
+    ssym = Symbol.convert_to_platform_symbol(ex_id, symbol)
+    trade_flag = request.form.get('flag')
+    # trade_flag = 0
+    price = request.form.get('price')
+    # price = 5000
+    num = request.form.get('num')
+    # num = 0.001
+    keys_data = keys_coll.find_one({"exchange": exchange})
+    key_info = get_apikeys(keys_data)
+    ret = {'code': 200, "msg": "成功"}
+    if len(acc_id_list):
+        pass
+    else:
+        accounts = HuobiUtil().get_accounts(key_info)
+        if accounts['status'] == 'error':
+            ret.update({'status': accounts})
+            ret['msg'] = '失败'
+            ret.pop('code')
+        else:
+            acc_id_list[0] = accounts['data'][0]['id']
+            place_ret = HuobiUtil().place(symbol=ssym, trade_flag=trade_flag, price=price, amount=num,
+                                  account_id=acc_id_list[0], api_key=key_info[0], api_secret=key_info[1])
+            ret.update({'status': place_ret})
+    return jsonify(ret)
 
 
 def do_ticker_test():
@@ -388,9 +382,21 @@ if __name__ == '__main__':
     # do_ticker_test()
     # get_market_ai_delta()
     # get_depth_info()
-    keys_data = keys_coll.find_one({"exchange": 'huobi'})
-    key_info = get_keys(keys_data)
-    print(key_info)
-    # HuobiUtil().get_accounts(key_info)
-    HuobiUtil().get_account_balance(key_info)
+    # keys_data = keys_coll.find_one({"exchange": 'huobi'})
+    # key_info = get_keys(keys_data)
+    # print(key_info)
+    # # HuobiUtil().get_accounts(key_info)
+    # HuobiUtil().get_account_balance(key_info)
+
+    # do_trade()
+    # keys_data = keys_coll.find_one({"exchange": 'huobi'})
+    # key_info = get_apikeys(keys_data)
+    # place_ret = HuobiUtil().place(symbol='btcusdt', trade_flag='sell-market', price=5.01, amount=0.001,
+    #                               account_id=4461503, api_key=key_info[0], api_secret=key_info[1])
+    # do_trade()
+    get_exchange_rate()
+    # test----
+    # exchange = 'huobi'.upper()
+    # ex_id = EXCHANGE_LIST.index(exchange)+1
+    # test----
     pass

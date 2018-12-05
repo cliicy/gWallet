@@ -34,17 +34,21 @@ class HttpCommunicator:
         postdata = params
         logger.info("%s,%s,%s" % (url, params, headers))
         response = requests.get(url, postdata, headers=headers, timeout=5)
+        ret = None
         try:
 
             if response.status_code == 200:
                 logger.info("response:%s" % (response.json()))
-                return response.json()
+                ret = response.json()
+                # return response.json()
             else:
                 logger.info("response:%s" % response.status_code)
-                return
+                ret = response
         except Exception as e:
             logger.error(e)
-            return
+            ret = e
+        finally:
+            return ret
 
     def http_post(self, url, params, headers, content_type=None, timeout=10):
 

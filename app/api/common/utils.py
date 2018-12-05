@@ -66,7 +66,7 @@ class FormateUtil(object):
         return dict
 
 
-def get_keys(info):
+def get_apikeys(info):
     dapi = info['api']
     dsecret = info['secret']
     tt = CryptoUtil().base64_decrypt(dapi)
