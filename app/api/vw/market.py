@@ -444,9 +444,8 @@ def do_place():
     trade_flag = place_type[int(trade_flag)]
     price = 5000
     num = 0.001
-    keys_data = keys_coll.find_one({"exchange": exchange})
-    # key_info = get_apikeys(keys_data)
-    key_info = ['a4eedce3-e30efad5-fad65169-d0704', '2f1c0132-89e3c837-84bd6370-bbdc5']
+    # keys_data = keys_coll.find_one({"exchange": exchange})
+    # # key_info = get_apikeys(keys_data)
     ret = {'code': 200, "msg": "成功"}
     if len(acc_id_list):
         pass
