@@ -11,6 +11,7 @@ import urllib
 import urllib.parse
 import urllib.request
 import json
+place_type = ['buy-limit', 'sell-limit', 'buy-market', 'sell-market']
 
 
 class HuobiUtil(SignatureUtil):
@@ -174,7 +175,6 @@ class HuobiUtil(SignatureUtil):
         params = {
               "amount": amount,
               "symbol": symbol,
-              "type": type,
               "price": price,
               "source": ''
         }
@@ -197,4 +197,14 @@ class HuobiUtil(SignatureUtil):
 
 
 if __name__ == '__main__':
+    # ret = {'code': 200, "msg": "成功"}
+    # if accounts['status'] == 'error':
+    #     ret.update({'status': accounts})
+    #     ret['msg'] = '失败'
+    #     ret.pop('code')
+    # else:
+    #     acc_id_list[0] = accounts['data'][0]['id']
+    #     place_ret = HuobiUtil().place(symbol=ssym, trade_flag=trade_flag, price=price, amount=num,
+    #                                   account_id=acc_id_list[0], api_key=key_info[0], api_secret=key_info[1])
+    #     ret.update({'status': place_ret})
     pass

@@ -3,6 +3,8 @@ from enum import Enum, unique
 
 
 SYMBOL_LIST = ['btc_usdt', 'bch_usdt', 'eth_usdt', 'ltc_usdt', 'eos_usdt', 'eth_btc', 'eos_btc', 'xrpusdt']
+WALLET_SYMBOL = ["BTC/USDT", "BCH/USDT", "ETH/USDT", "LTC/USDT", "EOS/USDT", "ETC/USDT"]
+
 STANDARD_SYMBOL_LIST = ["BTC/USDT", "BCH/USDT", "ETH/USDT", "LTC/USDT", "EOS/USDT", "ETH/BTC", "EOS/BTC",
                         "XRP/USDT", "BCC/USDT", "ETC/USDT", "BCH/BTC", "LTC/BTC",  "XRP/BTC", "BCH/ETH",
                         "LTC/ETH", "EOS/ETH", "XRP/ETH"]

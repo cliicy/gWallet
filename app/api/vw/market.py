@@ -1,10 +1,10 @@
 from flask import jsonify, Blueprint, request
-from app.config.enums import Symbol, STANDARD_SYMBOL_LIST, Platform, EXCHANGE_LIST
+from app.config.enums import Symbol, STANDARD_SYMBOL_LIST, WALLET_SYMBOL, EXCHANGE_LIST
 from app.config.secure import ticker_coll, ai_news_coll, logo_coll, fxh_coll, depth_coll, keys_coll, \
     rate_coll, detail_coll
 from app.api.common.transfer_func import num_transfer
 from app.api.common.utils import get_apikeys
-from app.api.common.huobi_util import HuobiUtil
+from app.api.common.huobi_util import HuobiUtil, place_type
 
 market = Blueprint('market', __name__)
 logo_list = {}
@@ -35,6 +35,35 @@ def get_coin_logo():
         # print('pass to get logo')
 
 
+def get_rate(exchange='huobi'):
+    exchange = exchange
+    k_query = {'exchange': exchange}
+    data = []
+    ret = {'rate_list': data}
+    get_coin_logo()
+    cc = 0
+    rate_data = rate_coll.find(k_query)
+    for ones in rate_data:
+        if ones['sym'] == 'usdt_cny':
+            data.append({'USDT': ones['rate']})
+    for keys, values in logo_list.items():
+        if cc > len(WALLET_SYMBOL):
+            break
+        sym = '{0}{1}'.format(keys, '/USDT')
+        if sym in WALLET_SYMBOL:
+            info = {}
+            info['logo'] = values['Logo']
+            k_query.update({'sym': sym})
+            rt = detail_coll.find_one(k_query)
+            if rt is None:
+                continue
+            info[keys] = rt['Price']
+            data.append(info)
+            cc += 1
+    # print(ret)
+    return ret
+
+
 @market.route("/vw/rate", methods=['POST'])
 def get_exchange_rate():
     # exchange = request.form.get('exchange')
@@ -48,10 +77,10 @@ def get_exchange_rate():
     for ones in rate_data:
         data.append({ones['sym']: ones['rate']})
     for keys, values in logo_list.items():
-        if cc > len(STANDARD_SYMBOL_LIST):
+        if cc > len(WALLET_SYMBOL):
             break
         sym = '{0}{1}'.format(keys, '/USDT')
-        if sym in STANDARD_SYMBOL_LIST:
+        if sym in WALLET_SYMBOL:
             info = {}
             info['logo'] = values['Logo']
             k_query.update({'sym': sym})
@@ -62,7 +91,6 @@ def get_exchange_rate():
             data.append(info)
             cc += 1
     return jsonify(ret)
-    # print(ret)
 
 
 @market.route("/login", methods=['GET', 'POST'])
@@ -323,20 +351,17 @@ def do_trade():
     入参{"exchang":"交易所名字"  "sym_id":"货币对id" "flag":"买卖标识，0买，1卖"
          "price":"价格" "num":"数量"
     """
-    # sym_id = '0'
-    # exchange = 'huobi'.upper()
     exchange = request.form.get('exchange')
     sym_id = request.form.get('sym_id')
-    print(sym_id)
+    # print('sym_id= ', sym_id)
     symbol = Symbol.get_stander_symbol(sym_id)
     ex_id = EXCHANGE_LIST.index(exchange.upper()) + 1
-    ssym = Symbol.convert_to_platform_symbol(ex_id, symbol)
+    sym = Symbol.convert_to_platform_symbol(str(ex_id), symbol)
     trade_flag = request.form.get('flag')
-    # trade_flag = 0
+    # print('flag类型：', type(trade_flag))
+    trade_flag = place_type[int(trade_flag)]
     price = request.form.get('price')
-    # price = 5000
     num = request.form.get('num')
-    # num = 0.001
     keys_data = keys_coll.find_one({"exchange": exchange})
     key_info = get_apikeys(keys_data)
     ret = {'code': 200, "msg": "成功"}
@@ -349,32 +374,65 @@ def do_trade():
             ret['msg'] = '失败'
             ret.pop('code')
         else:
-            acc_id_list[0] = accounts['data'][0]['id']
-            place_ret = HuobiUtil().place(symbol=ssym, trade_flag=trade_flag, price=price, amount=num,
+            acc_id_list.append(accounts['data'][0]['id'])
+            place_ret = HuobiUtil().place(symbol=sym, trade_flag=trade_flag, price=price, amount=num,
                                   account_id=acc_id_list[0], api_key=key_info[0], api_secret=key_info[1])
             ret.update({'status': place_ret})
+            ret['msg'] = place_ret['status']
     return jsonify(ret)
 
 
-def do_ticker_test():
-    exchange = 'huobi'
-    k_query = {'exchange': exchange, 'sym': {'$in': STANDARD_SYMBOL_LIST}}
-    # k_query = {'exchange': exchange, 'sym': STANDARD_SYMBOL_LIST}
-    data = ticker_coll.find(k_query, {'sym': 1, 'exchange': 1})
-    # data = ticker_coll.find(k_query, {'sym': 1, 'exchange': 1})
-    if data is None:
-        print('Error')
-    else:
-        ret = {'code': 200, "msg": "成功", "data": {"list": []}}
-        count = data.count()
-        if count > 0:
-            rdata = []
-            for dd in data:
-                dd.pop('_id')
-                # dd.pop('api')
-                rdata.append(dd)
-            ret['data']['list'] = rdata
-        print(ret)
+# def do_ticker_test():
+# #     exchange = 'huobi'
+# #     k_query = {'exchange': exchange, 'sym': {'$in': STANDARD_SYMBOL_LIST}}
+# #     # k_query = {'exchange': exchange, 'sym': STANDARD_SYMBOL_LIST}
+# #     data = ticker_coll.find(k_query, {'sym': 1, 'exchange': 1})
+# #     # data = ticker_coll.find(k_query, {'sym': 1, 'exchange': 1})
+# #     if data is None:
+# #         print('Error')
+# #     else:
+# #         ret = {'code': 200, "msg": "成功", "data": {"list": []}}
+# #         count = data.count()
+# #         if count > 0:
+# #             rdata = []
+# #             for dd in data:
+# #                 dd.pop('_id')
+# #                 # dd.pop('api')
+# #                 rdata.append(dd)
+# #             ret['data']['list'] = rdata
+# #         print(ret)
+# #
+# #
+# # def do_place():
+# #     exchange = 'huobi'
+# #     sym_id = '0'
+# #     print('sym_id= ', sym_id)
+# #     symbol = Symbol.get_stander_symbol(sym_id)
+# #     ex_id = EXCHANGE_LIST.index(exchange.upper()) + 1
+# #     sym = Symbol.convert_to_platform_symbol(str(ex_id), symbol)
+# #     # trade_flag = request.form.get('flag')
+# #     trade_flag = 0
+# #     trade_flag = place_type[int(trade_flag)]
+# #     price = 5000
+# #     num = 0.001
+# #     keys_data = keys_coll.find_one({"exchange": exchange})
+# #     key_info = get_apikeys(keys_data)
+# #     ret = {'code': 200, "msg": "成功"}
+# #     if len(acc_id_list):
+# #         pass
+# #     else:
+# #         accounts = HuobiUtil().get_accounts(key_info)
+# #         if accounts['status'] == 'error':
+# #             ret.update({'status': accounts})
+# #             ret['msg'] = '失败'
+# #             ret.pop('code')
+# #         else:
+# #             acc_id_list.append(accounts['data'][0]['id'])
+# #     place_ret = HuobiUtil().place(symbol=sym, trade_flag=trade_flag, price=price, amount=num,
+# #                                   account_id=acc_id_list[0], api_key=key_info[0], api_secret=key_info[1])
+# #     ret.update({'status': place_ret})
+# #     ret['msg'] = place_ret
+# #     print(ret)
 
 
 if __name__ == '__main__':
@@ -393,9 +451,13 @@ if __name__ == '__main__':
     # key_info = get_apikeys(keys_data)
     # place_ret = HuobiUtil().place(symbol='btcusdt', trade_flag='sell-market', price=5.01, amount=0.001,
     #                               account_id=4461503, api_key=key_info[0], api_secret=key_info[1])
+    # keys_data = keys_coll.find_one({"exchange": 'huobi'})
+    # key_info = get_apikeys(keys_data)
+    # do_place()
     # do_trade()
-    get_exchange_rate()
+    # get_exchange_rate()
     # test----
+    # get_rate('fcoin')
     # exchange = 'huobi'.upper()
     # ex_id = EXCHANGE_LIST.index(exchange)+1
     # test----
