@@ -67,13 +67,13 @@ class FormateUtil(object):
 
 
 def get_apikeys(info):
-    api = info['api']
+    access = info['access']
     secret = info['secret']
-    tt = CryptoUtil().base64_decrypt(api)
-    api = CryptoUtil().decrypt(tt)
+    tt = CryptoUtil().base64_decrypt(access)
+    access = CryptoUtil().decrypt(tt)
     tts = CryptoUtil().base64_decrypt(secret)
     secret = CryptoUtil().decrypt(tts)
-    return [api, secret]
+    return [access, secret]
 
 
 if __name__ == '__main__':

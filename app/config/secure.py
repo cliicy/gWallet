@@ -23,12 +23,14 @@ mdb = {
     "Y1": 'dw_Y1',
     "MON1": 'dw_MON1',
     "depth": 'dw_depth',
-    "api_secret": 'accounts',
+    "acc": 'accounts',
+    "bal": 'balance',
     "rate": 'dw_currency_rate',
     "market_detail": 'dw_ticker_detail',
     "jgy": 'jgy',
     "coin_logo": 'dw_coin_logo',
     "feixiaohao": 'dw_fxh',
+    "orders": 'orders',
     "future": 'ok_future'
 }
 
@@ -48,9 +50,11 @@ future_kline_coll = sdb[mdb["future"]]
 logo_coll = sdb[mdb["coin_logo"]]
 fxh_coll = sdb[mdb["feixiaohao"]]
 depth_coll = sdb[mdb["depth"]]
-keys_coll = sdb[mdb["api_secret"]]
+acc_coll = sdb[mdb["acc"]]
 rate_coll = sdb[mdb["rate"]]
 detail_coll = sdb[mdb["market_detail"]]
+balance_coll = sdb[mdb["bal"]]
+orders_coll = sdb[mdb["orders"]]
 
 
 class MonitoringAlarmConfig(object):

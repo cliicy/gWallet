@@ -1,7 +1,7 @@
 from flask import jsonify, Blueprint, request
 from app.config.enums import Symbol, STANDARD_SYMBOL_LIST, WALLET_SYMBOL, EXCHANGE_LIST
-from app.config.secure import ticker_coll, ai_news_coll, logo_coll, fxh_coll, depth_coll, keys_coll, \
-    rate_coll, detail_coll
+from app.config.secure import ticker_coll, ai_news_coll, logo_coll, fxh_coll, depth_coll, acc_coll, \
+    rate_coll, detail_coll, balance_coll, orders_coll
 from app.api.common.transfer_func import num_transfer
 from app.api.common.utils import get_apikeys
 from app.api.common.huobi_util import HuobiUtil, place_type
@@ -279,33 +279,27 @@ def get_depth_info():
     sym_id = request.form.get('sym_id')
     total_amount = request.form.get('total_sum')
     symbol = Symbol.get_stander_symbol(sym_id)
+    acc_sym = symbol.split('/')[0].lower()
     k_query = {"exchange": exchange, "sym": symbol}
+
+    # 获取当前登陆用户的sym对应的余额
+    # 用户的登陆信息 默认数据库中的值
+    # keys_data = acc_coll.find_one({"exchange": exchange, "api": 'key'})
+    # key_info = get_apikeys(keys_data)
+    acc_info = acc_coll.find({"exchange": exchange, "api": 'accounts'})
+    balance = '-1'
+    for one in acc_info:
+        acc_id = one['id']
+        acc_id_list.append(acc_id)
+        rt = balance_coll.find_one({"exchange": exchange, "acc_id": acc_id, "acc_state": 'working',
+                                    "acc_type": 'spot', "sym": acc_sym, "type": 'trade'})
+        if 'balance' in rt:
+            balance = rt['balance']
+    # 获取当前登陆用户的sym对应的余额
+
     data = depth_coll.find(k_query).sort("ts", -1).limit(5)
-    keys_data = keys_coll.find_one({"exchange": exchange})
-    key_info = get_apikeys(keys_data)
-    # 获取此账户及其下各个子账户中的所有拥有此币种的所有余额信息
-    acc_ret = HuobiUtil().get_account_balance(key_info)
-    print('账户信息：', acc_ret)
-    bal = request.form.get('bal')  # 只是设置初始值为null
-    balance = bal
-    if len(acc_ret) > 0:
-        sym = symbol.split('/')[0].lower()
-        for acc in acc_ret:
-            # balance['status'] = acc['status']
-            if acc['status'] == 'ok':
-                coin_list = acc['data']['list']
-                for info in coin_list:
-                    if sym == info['currency']:
-                        if acc['data']['type'] == 'spot':
-                            if acc['data']['state'] == 'working':
-                                if info['type'] == 'trade':
-                                    # print('&&&&&&&&&&& ', info)
-                                    balance = info['balance']
-                                    acc_id_list.append(acc['data']['id'])
-                                    break
     if data is None:
         return jsonify({'code：': 'Error'})
-        # print('Error')
     else:
         ret = {'code': 200, "msg": "成功", "data": {}}
         count = data.count()
@@ -333,8 +327,8 @@ def get_depth_info():
                 get_sym_id_log(symbol, dd)
                 dd['delta'] = change
                 # ts = time_stamp(dd['ts'])
-                buy_data.append({'buy_price': str(dd['buy_price']), 'buy_amt': str(dd['buy_amt'])})  # , 'ts': ts
-                sell_data.append({'sell_price': str(dd['sell_price']), 'sell_amt': str(dd['sell_amt'])})  # , 'ts': ts
+                buy_data.append({'buy_price': str(dd['buy_price']), 'buy_amt': str(dd['buy_amt'])})
+                sell_data.append({'sell_price': str(dd['sell_price']), 'sell_amt': str(dd['sell_amt'])})
             ret['data'].update(dd_data)
             ret['data']['list_sell_out'] = sell_data
             ret['data']['list_buying'] = buy_data
@@ -342,24 +336,22 @@ def get_depth_info():
             # 获取所有提交的订单信息
             ex_id = EXCHANGE_LIST.index(exchange.upper()) + 1
             sym = Symbol.convert_to_platform_symbol(str(ex_id), symbol)
-            types = ''
-            for item in place_type:
-                types += item + ','
-            types = types.rstrip(',')
             od_info = {}
             try:
-                orders_ret = HuobiUtil().get_order(sym=sym, types=types, api_key=key_info[0], api_secret=key_info[1])
-                if len(orders_ret['data']):
-                    rdata = orders_ret['data']
-                    lt_name = rdata['type']
-                    lt_date = rdata['created-at']
-                    ent_num = orders_ret('field-amount')
-                    deal_num = orders_ret('field-cash-amount')
-                    ent_price = orders_ret('price')
-                    status = orders_ret('state')
-                    cancel_yn = 'Y'
-                    if status == 'filled' or status == 'canceled':
-                        cancel_yn = 'N'
+                for idi in acc_id_list:
+                    order_query = {'acc_id': idi, 'exchange': exchange, 'sym': sym}
+                    orders_ret = orders_coll.find(order_query)
+                    if len(orders_ret['data']):
+                        rdata = orders_ret['data']
+                        lt_name = rdata['type']
+                        lt_date = rdata['created-at']
+                        ent_num = orders_ret('field-amount')
+                        deal_num = orders_ret('field-cash-amount')
+                        ent_price = orders_ret('price')
+                        status = orders_ret('state')
+                        cancel_yn = 'Y'
+                        if status == 'filled' or status == 'canceled':
+                            cancel_yn = 'N'
             except BaseException as e:
                 od_info.update({'msg': e})
             finally:
@@ -391,12 +383,17 @@ def do_trade():
     trade_flag = place_type[int(trade_flag)]
     price = request.form.get('price')
     num = request.form.get('num')
-    keys_data = keys_coll.find_one({"exchange": exchange})
+    keys_data = acc_coll.find_one({"exchange": exchange, "api": 'key'})
     key_info = get_apikeys(keys_data)
     ret = {'code': 200, "msg": "成功"}
     if len(acc_id_list):
         pass
     else:
+        acc_info = acc_coll.find({"exchange": exchange, "api": 'accounts'})
+        for one in acc_info:
+            acc_id = one['id']
+            acc_id_list.append(acc_id)
+    # 需要验证登陆状态
         accounts = HuobiUtil().get_accounts(key_info)
         if accounts['status'] == 'error':
             ret.update({'status': accounts})

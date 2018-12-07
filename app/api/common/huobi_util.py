@@ -108,9 +108,10 @@ class HuobiUtil(SignatureUtil):
         return signature
 
     def get_accounts(self, acc_info):
-        """
-        :return:
-        """
+        # """
+        # :return:
+        # """
+        return
         path = "/v1/account/accounts"
         params = {}
         params.update({'ACCESS_KEY': acc_info[0], 'SECRET_KEY': acc_info[1]})
@@ -122,6 +123,7 @@ class HuobiUtil(SignatureUtil):
         :param acc_info:
         :return:
         """
+        return
         rbalance = []
         try:
             ret = self.get_accounts(acc_info)
@@ -200,6 +202,7 @@ class HuobiUtil(SignatureUtil):
          :param order_id:
           :return:
         """
+        return
         params = {}
         url = "/v1/order/orders/"
         try:
