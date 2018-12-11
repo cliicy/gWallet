@@ -3,14 +3,14 @@ from app.config.enums import Symbol, STANDARD_SYMBOL_LIST, WALLET_SYMBOL, EXCHAN
 from app.config.secure import ticker_coll, ai_news_coll, logo_coll, fxh_coll, depth_coll, acc_coll, \
     rate_coll, detail_coll, balance_coll, orders_coll
 from app.api.common.transfer_func import num_transfer
-from app.api.common.utils import get_apikeys
+from app.api.common.utils import get_apikeys, set_apikeys
 from app.api.common.huobi_util import HuobiUtil, place_type
-import json
+import time
 
 market = Blueprint('market', __name__)
 logo_list = {}
 exchange_id_list = {}
-acc_id_list = []
+acc_id_list = []  # 特指现货ID， 实际上会有其他总类的ID
 account_info = {}
 ip_prefix = 'http://10.0.72.91:5000'
 
@@ -232,6 +232,33 @@ def get_market_ai_delta():
         return jsonify(ret)
 
 
+@market.route('/vw/add_exchange', methods=['POST'])
+def add_exchange():
+    """
+    2ce08492-1d69-4e97-9e4a-78801d454a1b
+    15BDC2068842DDA5F9F90B71ED826276
+    :return:
+    """
+    ret = {'code': 200, "msg": "成功"}
+    exchange = request.form.get('exchange')
+    api_key = request.form.get('api_key')
+    secret_key = request.form.get('secret_key')
+    # api_key = '2ce08492-1d69-4e97-9e4a-78801d454a1b'
+    # secret_key = '15BDC2068842DDA5F9F90B71ED826276'
+    # only for test
+    # exchange = 'okex'
+    # only for test
+    key_info = set_apikeys({'access': api_key, 'secret': secret_key})
+    try:
+        acc_coll.update({'exchange': exchange, 'api': 'key'},
+                        {'$set': {'access': key_info[0], 'secret': key_info[1]}}, True)
+    except Exception as e:
+        ret.update({'data': e})
+    finally:
+        return jsonify(ret)
+        # print(ret)
+
+
 @market.route('/vw/market', methods=['POST'])
 def get_market_info():
     exchange = request.form.get('exchange')
@@ -261,20 +288,64 @@ def get_market_info():
         return jsonify(ret)
 
 
+@market.route('/vw/orders', methods=['POST'])
+def get_orders_info():
+    """
+    获取所有提交的订单信息
+      "limitMarketOrderFlag":"限价单、市价单的标识，0，1表示，不分买卖",
+    :return: 
+    """
+    exchange = request.form.get('exchange')
+    sym_id = request.form.get('sym_id')
+    symbol = Symbol.get_stander_symbol(sym_id)
+    order_type = request.form.get('order_flag')
+
+    ex_id = EXCHANGE_LIST.index(exchange.upper()) + 1
+    sym = Symbol.convert_to_platform_symbol(str(ex_id), symbol)
+
+    # 用户的登陆信息 默认数据库中的值
+    if len(acc_id_list) == 0:
+        acc_info = acc_coll.find({"exchange": exchange, "api": 'accounts', "type": 'spot'})
+        for one in acc_info:
+            acc_id = one['id']
+            acc_id_list.append(acc_id)
+    accid = '{0}'.format(acc_id_list[0])
+    k_query = {"exchange": exchange, "sym": sym, "acc_id": accid}
+    if order_type == '0':  # 显示所有的限价单
+        k_query['type'] = {"$regex": "^\S+limit$"}
+    elif order_type == '1':  # 显示所有的市价单
+        k_query['type'] = {"$regex": "^\S+market$"}
+    ord_ret = orders_coll.find(k_query)
+
+    ord_list = []
+    ret = {'code': 200, "msg": "成功", "data": {}}
+    try:
+        for rdata in ord_ret:
+            status = rdata['state']
+            cancel_yn = 'Y'
+            if status == 'filled' or status == 'canceled':
+                cancel_yn = 'N'
+            od_info = {}
+            od_info.update({'name': rdata['order_id']})
+            od_info.update({'date': rdata['created-at']})
+            od_info.update({'entrustment_num': rdata['field-amount']})
+            od_info.update({'make_deal__num': rdata['field-cash-amount']})
+            od_info.update({'entrustment_price': rdata['price']})
+            od_info.update({'cancel_orderstate': cancel_yn})
+            ord_list.append(od_info)
+    except Exception as e:
+        ord_list.append({'msg': e})
+    finally:
+        ret['data']['list'] = ord_list
+    return jsonify(ret)
+
+
 @market.route('/vw/depth', methods=['POST'])
 def get_depth_info():
     """
     交易页面获取数据接口 要提供给前端depth的部分信息及账户余额信息
     :return:
     """
-    # sym_id = '0'
-    # exchange = 'huobi'
-    lt_name = request.form.get('limit_name')
-    lt_date = request.form.get('limit_date')
-    ent_num = request.form.get('num')
-    deal_num = request.form.get('deal_num')
-    ent_price = request.form.get('ent_price')
-    cancel_yn = request.form.get('yn_cancel')
     exchange = request.form.get('exchange')
     sym_id = request.form.get('sym_id')
     total_amount = request.form.get('total_sum')
@@ -284,8 +355,6 @@ def get_depth_info():
 
     # 获取当前登陆用户的sym对应的余额
     # 用户的登陆信息 默认数据库中的值
-    # keys_data = acc_coll.find_one({"exchange": exchange, "api": 'key'})
-    # key_info = get_apikeys(keys_data)
     acc_info = acc_coll.find({"exchange": exchange, "api": 'accounts'})
     balance = '-1'
     for one in acc_info:
@@ -332,36 +401,6 @@ def get_depth_info():
             ret['data'].update(dd_data)
             ret['data']['list_sell_out'] = sell_data
             ret['data']['list_buying'] = buy_data
-
-            # 获取所有提交的订单信息
-            ex_id = EXCHANGE_LIST.index(exchange.upper()) + 1
-            sym = Symbol.convert_to_platform_symbol(str(ex_id), symbol)
-            od_info = {}
-            try:
-                for idi in acc_id_list:
-                    order_query = {'acc_id': idi, 'exchange': exchange, 'sym': sym}
-                    orders_ret = orders_coll.find(order_query)
-                    if len(orders_ret['data']):
-                        rdata = orders_ret['data']
-                        lt_name = rdata['type']
-                        lt_date = rdata['created-at']
-                        ent_num = orders_ret('field-amount')
-                        deal_num = orders_ret('field-cash-amount')
-                        ent_price = orders_ret('price')
-                        status = orders_ret('state')
-                        cancel_yn = 'Y'
-                        if status == 'filled' or status == 'canceled':
-                            cancel_yn = 'N'
-            except BaseException as e:
-                od_info.update({'msg': e})
-            finally:
-                od_info.update({'limit_name': lt_name})
-                od_info.update({'limit_date': lt_date})
-                od_info.update({'entrustment_num': ent_num})
-                od_info.update({'make_deal__num': deal_num})
-                od_info.update({'entrustment_price': ent_price})
-                od_info.update({'cancel_orderstate': cancel_yn})
-                ret['data']['list_Limit'] = [od_info]
         return jsonify(ret)
 
 
@@ -386,53 +425,38 @@ def do_trade():
     keys_data = acc_coll.find_one({"exchange": exchange, "api": 'key'})
     key_info = get_apikeys(keys_data)
     ret = {'code': 200, "msg": "成功"}
+    # 需要验证登陆状态
     if len(acc_id_list):
         pass
     else:
-        acc_info = acc_coll.find({"exchange": exchange, "api": 'accounts'})
+        ret['msg'] = '请先登陆'
+        time.sleep(2)
+        acc_info = acc_coll.find({"exchange": exchange, "api": 'accounts', "type": 'spot'})
         for one in acc_info:
             acc_id = one['id']
             acc_id_list.append(acc_id)
-    # 需要验证登陆状态
-        accounts = HuobiUtil().get_accounts(key_info)
-        if accounts['status'] == 'error':
-            ret.update({'status': accounts})
-            ret['msg'] = '失败'
-            ret.pop('code')
-        else:
-            acc_id_list.append(accounts['data'][0]['id'])
-            place_ret = HuobiUtil().place(symbol=sym, trade_flag=trade_flag, price=price, amount=num,
-                                  account_id=acc_id_list[0], api_key=key_info[0], api_secret=key_info[1])
-            ret.update({'status': place_ret})
-            ret['msg'] = place_ret['status']
+        place_ret = HuobiUtil().place(symbol=sym, trade_flag=trade_flag, price=price, amount=num,
+                                      account_id=acc_id_list[0], api_key=key_info[0], api_secret=key_info[1])
+        ret.update({'status': place_ret})
+        ret['msg'] = place_ret['status']
     return jsonify(ret)
 
 
-# def do_ticker_test():
-# #     exchange = 'huobi'
-# #     k_query = {'exchange': exchange, 'sym': {'$in': STANDARD_SYMBOL_LIST}}
-# #     # k_query = {'exchange': exchange, 'sym': STANDARD_SYMBOL_LIST}
-# #     data = ticker_coll.find(k_query, {'sym': 1, 'exchange': 1})
-# #     # data = ticker_coll.find(k_query, {'sym': 1, 'exchange': 1})
-# #     if data is None:
-# #         print('Error')
-# #     else:
-# #         ret = {'code': 200, "msg": "成功", "data": {"list": []}}
-# #         count = data.count()
-# #         if count > 0:
-# #             rdata = []
-# #             for dd in data:
-# #                 dd.pop('_id')
-# #                 # dd.pop('api')
-# #                 rdata.append(dd)
-# #             ret['data']['list'] = rdata
-# #         print(ret)
-# #
-# #
 def do_place():
     exchange = 'huobi'
     sym_id = '0'
     print('sym_id= ', sym_id)
+
+    order_query = {'acc_id': '5632276', 'exchange': exchange, 'sym': 'btcusdt'}
+    orders_ret = orders_coll.find(order_query)
+    print(orders_ret)
+    for rdata in orders_ret:
+        status = rdata['state']
+        cancel_yn = 'Y'
+        if status == 'filled' or status == 'canceled':
+            cancel_yn = 'N'
+        print(cancel_yn)
+    return
     symbol = Symbol.get_stander_symbol(sym_id)
     ex_id = EXCHANGE_LIST.index(exchange.upper()) + 1
     sym = Symbol.convert_to_platform_symbol(str(ex_id), symbol)
@@ -485,9 +509,10 @@ if __name__ == '__main__':
     #                               account_id=4461503, api_key=key_info[0], api_secret=key_info[1])
     # keys_data = keys_coll.find_one({"exchange": 'huobi'})
     # key_info = get_apikeys(keys_data)
-    do_place()
-    # do_trade()
+    # do_place()
+    # get_orders_info()
     # get_exchange_rate()
+    add_exchange()
     # test----
     # get_rate('fcoin')
     # exchange = 'huobi'.upper()

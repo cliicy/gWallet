@@ -76,6 +76,16 @@ def get_apikeys(info):
     return [access, secret]
 
 
+def set_apikeys(info):
+    access = info['access']
+    secret = info['secret']
+    tt = CryptoUtil().encrypt(access)
+    api_key = CryptoUtil().base64_encrypt(tt)
+    tts = CryptoUtil().encrypt(secret)
+    secret_key = CryptoUtil().base64_encrypt(tts)
+    return [api_key, secret_key]
+
+
 if __name__ == '__main__':
     # 从命令行运行没有出错 在pycharm里运行会有错： from cryptography.hazmat.bindings._openssl import ffi, lib
     # ImportError: DLL load failed: 找不到指定的模块。
